@@ -1,9 +1,7 @@
 'use client';
 import { create } from 'zustand';
 import { Sale, Period } from '@/lib/types';
-import { getStorage, setStorage } from '@/lib/seed';
-
-const KEY = 'bc_sales';
+import { supabase } from '@/lib/supabase';
 
 function getDateRange(period: Period): { start: string; end: string } {
   const now = new Date();
@@ -16,7 +14,6 @@ function getDateRange(period: Period): { start: string; end: string } {
     d.setDate(d.getDate() - 6);
     start = d.toISOString().split('T')[0];
   } else {
-    // monthly
     start = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
   }
   return { start, end };
@@ -24,10 +21,10 @@ function getDateRange(period: Period): { start: string; end: string } {
 
 interface SalesState {
   sales: Sale[];
-  load: () => void;
-  addSale: (s: Omit<Sale, 'id' | 'createdAt'>) => void;
-  updateSale: (id: string, s: Partial<Omit<Sale, 'id' | 'createdAt'>>) => void;
-  deleteSale: (id: string) => void;
+  load: () => Promise<void>;
+  addSale: (s: Omit<Sale, 'id' | 'createdAt'>) => Promise<void>;
+  updateSale: (id: string, s: Partial<Omit<Sale, 'id' | 'createdAt'>>) => Promise<void>;
+  deleteSale: (id: string) => Promise<void>;
   getSalesByPeriod: (period: Period) => Sale[];
   getRevenueByPeriod: (period: Period) => number;
   getSalesByStaff: (period: Period) => { staffId: string; staffName: string; count: number; total: number }[];
@@ -39,34 +36,88 @@ interface SalesState {
 export const useSalesStore = create<SalesState>((set, get) => ({
   sales: [],
 
-  load: () => {
-    const sales = getStorage<Sale[]>(KEY, []);
-    set({ sales });
+  load: async () => {
+    const { data, error } = await supabase.from('sales').select('*').order('created_at', { ascending: false });
+    if (error) { console.error('Error loading sales:', error); return; }
+    const mapped: Sale[] = data.map(row => ({
+      id: row.id,
+      plate: row.plate,
+      vehicleType: row.vehicle_type,
+      serviceId: row.service_id,
+      serviceName: row.service_name,
+      amount: row.amount,
+      staffId: row.staff_id,
+      staffName: row.staff_name,
+      date: row.date,
+      note: row.note,
+      createdAt: row.created_at
+    }));
+    set({ sales: mapped });
   },
 
-  addSale: (data) => {
-    const newSale: Sale = { ...data, id: 'sale' + Date.now(), createdAt: new Date().toISOString() };
-    const updated = [newSale, ...get().sales];
-    setStorage(KEY, updated);
-    set({ sales: updated });
+  addSale: async (data) => {
+    const { data: inserted, error } = await supabase.from('sales').insert({
+      plate: data.plate,
+      vehicle_type: data.vehicleType,
+      service_id: data.serviceId,
+      service_name: data.serviceName,
+      amount: data.amount,
+      staff_id: data.staffId,
+      staff_name: data.staffName,
+      date: data.date,
+      note: data.note
+    }).select().single();
+    if (error) { console.error(error); return; }
+    
+    const newSale: Sale = {
+      id: inserted.id,
+      plate: inserted.plate,
+      vehicleType: inserted.vehicle_type,
+      serviceId: inserted.service_id,
+      serviceName: inserted.service_name,
+      amount: inserted.amount,
+      staffId: inserted.staff_id,
+      staffName: inserted.staff_name,
+      date: inserted.date,
+      note: inserted.note,
+      createdAt: inserted.created_at
+    };
+    
+    set({ sales: [newSale, ...get().sales] });
   },
 
-  deleteSale: (id) => {
+  deleteSale: async (id) => {
     if (!confirm('Bu satışı silmek istediğinize emin misiniz?')) return;
-    const updated = get().sales.filter(s => s.id !== id);
-    setStorage(KEY, updated);
-    set({ sales: updated });
+    const prev = get().sales;
+    set({ sales: prev.filter(s => s.id !== id) });
+    
+    const { error } = await supabase.from('sales').delete().eq('id', id);
+    if (error) {
+      console.error(error);
+      set({ sales: prev });
+    }
   },
 
-  updateSale: (id, data) => {
-    const updated = get().sales.map(s => {
-      if (s.id === id) {
-        return { ...s, ...data };
-      }
-      return s;
-    });
-    setStorage(KEY, updated);
-    set({ sales: updated });
+  updateSale: async (id, data) => {
+    const updates: any = {};
+    if (data.plate !== undefined) updates.plate = data.plate;
+    if (data.vehicleType !== undefined) updates.vehicle_type = data.vehicleType;
+    if (data.serviceId !== undefined) updates.service_id = data.serviceId;
+    if (data.serviceName !== undefined) updates.service_name = data.serviceName;
+    if (data.amount !== undefined) updates.amount = data.amount;
+    if (data.staffId !== undefined) updates.staff_id = data.staffId;
+    if (data.staffName !== undefined) updates.staff_name = data.staffName;
+    if (data.date !== undefined) updates.date = data.date;
+    if (data.note !== undefined) updates.note = data.note;
+
+    const prev = get().sales;
+    set({ sales: prev.map(s => s.id === id ? { ...s, ...data } : s) });
+
+    const { error } = await supabase.from('sales').update(updates).eq('id', id);
+    if (error) {
+      console.error(error);
+      set({ sales: prev });
+    }
   },
 
   getSalesByPeriod: (period) => {

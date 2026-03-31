@@ -25,7 +25,7 @@ export default function UsersPage() {
 interface UserModalProps {
   user?: User | null;
   onClose: () => void;
-  onSave: (data: { name: string; email: string; role: Role; password?: string }) => { success: boolean; error?: string };
+  onSave: (data: { name: string; email: string; role: Role; password?: string }) => Promise<{ success: boolean; error?: string }>;
 }
 
 function UserModal({ user, onClose, onSave }: UserModalProps) {
@@ -35,7 +35,7 @@ function UserModal({ user, onClose, onSave }: UserModalProps) {
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState<{ name?: string; email?: string; password?: string; general?: string }>({});
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const errs: typeof errors = {};
     const nameErr = validateName(name);
@@ -52,7 +52,7 @@ function UserModal({ user, onClose, onSave }: UserModalProps) {
     setErrors(errs);
     if (Object.keys(errs).length > 0) return;
 
-    const result = onSave({ name: name.trim(), email: email.trim().toLowerCase(), role, ...(password ? { password } : {}) });
+    const result = await onSave({ name: name.trim(), email: email.trim().toLowerCase(), role, ...(password ? { password } : {}) });
     if (!result.success) { setErrors({ general: result.error }); return; }
     onClose();
   };
@@ -181,14 +181,14 @@ function UsersContent() {
     u.role.toLowerCase().includes(search.toLowerCase())
   );
 
-  const handleSave = (data: { name: string; email: string; role: Role; password?: string }) => {
+  const handleSave = async (data: { name: string; email: string; role: Role; password?: string }) => {
     if (editing) {
       updateUser(editing.id, { name: data.name, email: data.email, role: data.role });
       if (data.password) resetPassword(editing.id, data.password);
       if (editing.id === currentUser?.userId) refresh();
       return { success: true };
     } else {
-      return addUser({ name: data.name, email: data.email, role: data.role, password: data.password! });
+      return await addUser({ name: data.name, email: data.email, role: data.role, password: data.password! });
     }
   };
 

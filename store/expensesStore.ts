@@ -1,9 +1,7 @@
 'use client';
 import { create } from 'zustand';
 import { Expense, Period } from '@/lib/types';
-import { getStorage, setStorage } from '@/lib/seed';
-
-const KEY = 'bc_expenses';
+import { supabase } from '@/lib/supabase';
 
 function getDateRange(period: Period): { start: string; end: string } {
   const now = new Date();
@@ -23,9 +21,9 @@ function getDateRange(period: Period): { start: string; end: string } {
 
 interface ExpensesState {
   expenses: Expense[];
-  load: () => void;
-  addExpense: (e: Omit<Expense, 'id' | 'createdAt'>) => void;
-  deleteExpense: (id: string) => void;
+  load: () => Promise<void>;
+  addExpense: (e: Omit<Expense, 'id' | 'createdAt'>) => Promise<void>;
+  deleteExpense: (id: string) => Promise<void>;
   getExpensesByPeriod: (period: Period) => Expense[];
   getTotalByPeriod: (period: Period) => number;
   getChartData: (period: Period) => { label: string; expenses: number; date: string }[];
@@ -35,22 +33,50 @@ interface ExpensesState {
 export const useExpensesStore = create<ExpensesState>((set, get) => ({
   expenses: [],
 
-  load: () => {
-    const expenses = getStorage<Expense[]>(KEY, []);
-    set({ expenses });
+  load: async () => {
+    const { data, error } = await supabase.from('expenses').select('*').order('date', { ascending: false });
+    if (error) { console.error('Error loading expenses:', error); return; }
+    const mapped: Expense[] = data.map(row => ({
+      id: row.id,
+      category: row.category,
+      amount: row.amount,
+      note: row.note,
+      date: row.date,
+      createdAt: row.created_at
+    }));
+    set({ expenses: mapped });
   },
 
-  addExpense: (data) => {
-    const newExpense: Expense = { ...data, id: 'exp' + Date.now(), createdAt: new Date().toISOString() };
-    const updated = [newExpense, ...get().expenses];
-    setStorage(KEY, updated);
-    set({ expenses: updated });
+  addExpense: async (data) => {
+    const { data: inserted, error } = await supabase.from('expenses').insert({
+      category: data.category,
+      amount: data.amount,
+      note: data.note,
+      date: data.date
+    }).select().single();
+    if (error) { console.error(error); return; }
+    
+    const newExpense: Expense = {
+      id: inserted.id,
+      category: inserted.category,
+      amount: inserted.amount,
+      note: inserted.note,
+      date: inserted.date,
+      createdAt: inserted.created_at
+    };
+    
+    set({ expenses: [newExpense, ...get().expenses] });
   },
 
-  deleteExpense: (id) => {
-    const updated = get().expenses.filter(e => e.id !== id);
-    setStorage(KEY, updated);
-    set({ expenses: updated });
+  deleteExpense: async (id) => {
+    const prev = get().expenses;
+    set({ expenses: prev.filter(e => e.id !== id) });
+    
+    const { error } = await supabase.from('expenses').delete().eq('id', id);
+    if (error) {
+      console.error(error);
+      set({ expenses: prev });
+    }
   },
 
   getExpensesByPeriod: (period) => {

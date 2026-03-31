@@ -1,0 +1,5 @@
+﻿app/(dashboard)/users/page.tsx(363,11): error TS2322: Type '(data: { name: string; email: string; role: Role; password?: string; }) => Promise<{ success: boolean; error?: string; }> | { success: boolean; }' is not assignable to type '(data: { name: string; email: string; role: Role; password?: string | undefined; }) => { success: boolean; error?: string | undefined; }'.
+  Type 'Promise<{ success: boolean; error?: string | undefined; }> | { success: boolean; }' is not assignable to type '{ success: boolean; error?: string | undefined; }'.
+    Property 'success' is missing in type 'Promise<{ success: boolean; error?: string | undefined; }>' but required in type '{ success: boolean; error?: string | undefined; }'.
+app/login/page.tsx(39,16): error TS2339: Property 'success' does not exist on type 'Promise<{ success: boolean; error?: string | undefined; }>'.
+app/login/page.tsx(44,35): error TS2339: Property 'error' does not exist on type 'Promise<{ success: boolean; error?: string | undefined; }>'.

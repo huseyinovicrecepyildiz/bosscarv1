@@ -127,33 +127,4 @@ export const SEED_DATA = {
   expenses: generateExpenses(),
 };
 
-export function initializeStorage() {
-  if (typeof window === 'undefined') return;
-  
-  if (!localStorage.getItem('bc_users'))    localStorage.setItem('bc_users',    JSON.stringify(SEED_DATA.users));
-  if (!localStorage.getItem('bc_services')) localStorage.setItem('bc_services', JSON.stringify(SEED_DATA.services));
-  if (!localStorage.getItem('bc_sales'))    localStorage.setItem('bc_sales',    JSON.stringify(SEED_DATA.sales));
-  if (!localStorage.getItem('bc_expenses')) localStorage.setItem('bc_expenses', JSON.stringify(SEED_DATA.expenses));
-}
-
-export function resetStorage() {
-  if (typeof window === 'undefined') return;
-  localStorage.setItem('bc_users',    JSON.stringify(SEED_DATA.users));
-  localStorage.setItem('bc_services', JSON.stringify(SEED_DATA.services));
-  localStorage.setItem('bc_sales',    JSON.stringify(SEED_DATA.sales));
-  localStorage.setItem('bc_expenses', JSON.stringify(SEED_DATA.expenses));
-}
-
-export function getStorage<T>(key: string, fallback: T): T {
-  if (typeof window === 'undefined') return fallback;
-  try { return JSON.parse(localStorage.getItem(key) || '') as T; } catch { return fallback; }
-}
-
-export function setStorage<T>(key: string, value: T) {
-  if (typeof window === 'undefined') return;
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch (err) {
-    console.error(`Storage error for ${key}:`, err);
-  }
-}
+// Removed old localStorage sync functions as we use Supabase now.

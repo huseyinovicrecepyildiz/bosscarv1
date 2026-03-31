@@ -2,14 +2,12 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
-import { initializeStorage } from '@/lib/seed';
 
 export default function HomePage() {
   const router = useRouter();
   const { user, init, initialized } = useAuthStore();
 
   useEffect(() => {
-    initializeStorage();
     init();
   }, [init]);
 

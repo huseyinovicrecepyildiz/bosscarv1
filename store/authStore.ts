@@ -5,7 +5,7 @@ import { AuthPayload, getAuthUser, login, logout } from '@/lib/auth';
 interface AuthState {
   user: AuthPayload | null;
   initialized: boolean;
-  login: (loginId: string, password: string) => { success: boolean; error?: string };
+  login: (loginId: string, password: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   init: () => void;
   refresh: () => void;
@@ -25,8 +25,8 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ user });
   },
 
-  login: (loginId, password) => {
-    const result = login(loginId, password);
+  login: async (loginId, password) => {
+    const result = await login(loginId, password);
     if (result.success && result.user) {
       set({ user: result.user });
       return { success: true };

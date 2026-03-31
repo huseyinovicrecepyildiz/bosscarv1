@@ -2,7 +2,6 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
-import { initializeStorage } from '@/lib/seed';
 import { validateLoginId, validatePassword } from '@/lib/validators';
 
 export default function LoginPage() {
@@ -15,7 +14,6 @@ export default function LoginPage() {
   const [showPass, setShowPass] = useState(false);
 
   useEffect(() => {
-    initializeStorage();
     init();
   }, [init]);
 
@@ -36,7 +34,7 @@ export default function LoginPage() {
     setErrors({});
     // Small delay for UX
     await new Promise(r => setTimeout(r, 400));
-    const result = login(loginId, password);
+    const result = await login(loginId, password);
 
     if (result.success) {
       // Keep loading=true, useEffect will redirect when user state updates
