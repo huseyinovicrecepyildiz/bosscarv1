@@ -131,7 +131,19 @@ export function initializeStorage() {
   if (typeof window === 'undefined') return;
   
   const existingUsers = localStorage.getItem('bc_users');
-  if (!existingUsers || existingUsers.includes('"id":"u1"')) {
+  let hasOldFormat = false;
+  if (existingUsers) {
+    try {
+      const parsed = JSON.parse(existingUsers);
+      if (Array.isArray(parsed) && parsed.some(user => user.id === 'u1' || user.id === 'u2')) {
+        hasOldFormat = true;
+      }
+    } catch {
+      hasOldFormat = true; // Invalid JSON is also an old format
+    }
+  }
+
+  if (!existingUsers || hasOldFormat) {
     resetStorage();
     return;
   }
