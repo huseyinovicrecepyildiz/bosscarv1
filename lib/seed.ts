@@ -130,24 +130,7 @@ export const SEED_DATA = {
 export function initializeStorage() {
   if (typeof window === 'undefined') return;
   
-  const existingUsers = localStorage.getItem('bc_users');
-  let hasOldFormat = false;
-  if (existingUsers) {
-    try {
-      const parsed = JSON.parse(existingUsers);
-      if (Array.isArray(parsed) && parsed.some(user => user.id === 'u1' || user.id === 'u2')) {
-        hasOldFormat = true;
-      }
-    } catch {
-      hasOldFormat = true; // Invalid JSON is also an old format
-    }
-  }
-
-  if (!existingUsers || hasOldFormat) {
-    resetStorage();
-    return;
-  }
-
+  if (!localStorage.getItem('bc_users'))    localStorage.setItem('bc_users',    JSON.stringify(SEED_DATA.users));
   if (!localStorage.getItem('bc_services')) localStorage.setItem('bc_services', JSON.stringify(SEED_DATA.services));
   if (!localStorage.getItem('bc_sales'))    localStorage.setItem('bc_sales',    JSON.stringify(SEED_DATA.sales));
   if (!localStorage.getItem('bc_expenses')) localStorage.setItem('bc_expenses', JSON.stringify(SEED_DATA.expenses));

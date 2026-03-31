@@ -18,20 +18,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const router = useRouter();
 
   useEffect(() => {
-    // Schema migration: detect old data format (services with no prices array) and reset
-    try {
-      const raw = localStorage.getItem('bc_services');
-      if (raw) {
-        const svcs = JSON.parse(raw);
-        if (Array.isArray(svcs) && svcs.length > 0 && !svcs[0].prices) {
-          // Old format — clear all and re-seed
-          localStorage.removeItem('bc_users');
-          localStorage.removeItem('bc_services');
-          localStorage.removeItem('bc_sales');
-          localStorage.removeItem('bc_expenses');
-        }
-      }
-    } catch {}
     initializeStorage();
     init();
   }, [init]);
