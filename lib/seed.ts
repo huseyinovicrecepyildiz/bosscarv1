@@ -151,5 +151,9 @@ export function getStorage<T>(key: string, fallback: T): T {
 
 export function setStorage<T>(key: string, value: T) {
   if (typeof window === 'undefined') return;
-  localStorage.setItem(key, JSON.stringify(value));
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch (err) {
+    console.error(`Storage error for ${key}:`, err);
+  }
 }
