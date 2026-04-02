@@ -3,15 +3,15 @@ version: '3.8'
 services:
   # Isolated PocketBase for Boss Car v1
   pb-v1:
-    image: mujo/pocketbase:latest
+    image: muchobien/pocketbase:latest
     container_name: boss-car-pb-v1
     restart: always
     ports:
-      - "8091:8090"
+      - "8091:8080" # muchobien uses 8080 by default
     volumes:
       - ./pb_data_v1:/pb_data
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8090/api/health"]
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/api/health"]
       interval: 10s
       timeout: 5s
       retries: 3
