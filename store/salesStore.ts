@@ -1,7 +1,6 @@
-'use client';
 import { create } from 'zustand';
 import { Sale, Period } from '@/lib/types';
-import { supabase } from '@/lib/supabase';
+import { pb } from '@/lib/pocketbase';
 
 function getDateRange(period: Period): { start: string; end: string } {
   const now = new Date();
@@ -37,53 +36,61 @@ export const useSalesStore = create<SalesState>((set, get) => ({
   sales: [],
 
   load: async () => {
-    const { data, error } = await supabase.from('sales').select('*').order('created_at', { ascending: false });
-    if (error) { console.error('Error loading sales:', error); return; }
-    const mapped: Sale[] = data.map(row => ({
-      id: row.id,
-      plate: row.plate,
-      vehicleType: row.vehicle_type,
-      serviceId: row.service_id,
-      serviceName: row.service_name,
-      amount: row.amount,
-      staffId: row.staff_id,
-      staffName: row.staff_name,
-      date: row.date,
-      note: row.note,
-      createdAt: row.created_at
-    }));
-    set({ sales: mapped });
+    try {
+      const records = await pb.collection('sales').getFullList({
+        sort: '-created',
+      });
+      const mapped: Sale[] = records.map(record => ({
+        id: record.id,
+        plate: record.plate,
+        vehicleType: record.vehicleType,
+        serviceId: record.serviceId,
+        serviceName: record.serviceName,
+        amount: record.amount,
+        staffId: record.staffId,
+        staffName: record.staffName,
+        date: record.date,
+        note: record.note,
+        createdAt: record.created
+      }));
+      set({ sales: mapped });
+    } catch (error) {
+      console.error('Error loading sales:', error);
+    }
   },
 
   addSale: async (data) => {
-    const { data: inserted, error } = await supabase.from('sales').insert({
-      plate: data.plate,
-      vehicle_type: data.vehicleType,
-      service_id: data.serviceId,
-      service_name: data.serviceName,
-      amount: data.amount,
-      staff_id: data.staffId,
-      staff_name: data.staffName,
-      date: data.date,
-      note: data.note
-    }).select().single();
-    if (error) { console.error(error); return; }
-    
-    const newSale: Sale = {
-      id: inserted.id,
-      plate: inserted.plate,
-      vehicleType: inserted.vehicle_type,
-      serviceId: inserted.service_id,
-      serviceName: inserted.service_name,
-      amount: inserted.amount,
-      staffId: inserted.staff_id,
-      staffName: inserted.staff_name,
-      date: inserted.date,
-      note: inserted.note,
-      createdAt: inserted.created_at
-    };
-    
-    set({ sales: [newSale, ...get().sales] });
+    try {
+      const inserted = await pb.collection('sales').create({
+        plate: data.plate,
+        vehicleType: data.vehicleType,
+        serviceId: data.serviceId,
+        serviceName: data.serviceName,
+        amount: data.amount,
+        staffId: data.staffId,
+        staffName: data.staffName,
+        date: data.date,
+        note: data.note
+      });
+      
+      const newSale: Sale = {
+        id: inserted.id,
+        plate: inserted.plate,
+        vehicleType: inserted.vehicleType,
+        serviceId: inserted.serviceId,
+        serviceName: inserted.serviceName,
+        amount: inserted.amount,
+        staffId: inserted.staffId,
+        staffName: inserted.staffName,
+        date: inserted.date,
+        note: inserted.note,
+        createdAt: inserted.created
+      };
+      
+      set({ sales: [newSale, ...get().sales] });
+    } catch (error) {
+      console.error(error);
+    }
   },
 
   deleteSale: async (id) => {
@@ -91,30 +98,21 @@ export const useSalesStore = create<SalesState>((set, get) => ({
     const prev = get().sales;
     set({ sales: prev.filter(s => s.id !== id) });
     
-    const { error } = await supabase.from('sales').delete().eq('id', id);
-    if (error) {
+    try {
+      await pb.collection('sales').delete(id);
+    } catch (error) {
       console.error(error);
       set({ sales: prev });
     }
   },
 
   updateSale: async (id, data) => {
-    const updates: any = {};
-    if (data.plate !== undefined) updates.plate = data.plate;
-    if (data.vehicleType !== undefined) updates.vehicle_type = data.vehicleType;
-    if (data.serviceId !== undefined) updates.service_id = data.serviceId;
-    if (data.serviceName !== undefined) updates.service_name = data.serviceName;
-    if (data.amount !== undefined) updates.amount = data.amount;
-    if (data.staffId !== undefined) updates.staff_id = data.staffId;
-    if (data.staffName !== undefined) updates.staff_name = data.staffName;
-    if (data.date !== undefined) updates.date = data.date;
-    if (data.note !== undefined) updates.note = data.note;
-
     const prev = get().sales;
     set({ sales: prev.map(s => s.id === id ? { ...s, ...data } : s) });
 
-    const { error } = await supabase.from('sales').update(updates).eq('id', id);
-    if (error) {
+    try {
+      await pb.collection('sales').update(id, data);
+    } catch (error) {
       console.error(error);
       set({ sales: prev });
     }
@@ -141,7 +139,6 @@ export const useSalesStore = create<SalesState>((set, get) => ({
   getChartData: (period) => {
     const sales = get().sales;
     if (period === 'daily') {
-      // Last 7 days, group by day
       const result: { label: string; revenue: number; date: string }[] = [];
       for (let i = 6; i >= 0; i--) {
         const d = new Date();
@@ -153,7 +150,6 @@ export const useSalesStore = create<SalesState>((set, get) => ({
       }
       return result;
     } else if (period === 'weekly') {
-      // Last 4 weeks, group by week
       const result: { label: string; revenue: number; date: string }[] = [];
       for (let w = 3; w >= 0; w--) {
         const endD = new Date();
@@ -168,7 +164,6 @@ export const useSalesStore = create<SalesState>((set, get) => ({
       }
       return result;
     } else {
-      // Last 6 months
       const result: { label: string; revenue: number; date: string }[] = [];
       const months = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'];
       for (let m = 5; m >= 0; m--) {

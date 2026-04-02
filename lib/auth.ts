@@ -1,5 +1,5 @@
 import { Role } from './types';
-import { supabase } from './supabase';
+import { pb } from './pocketbase';
 
 export interface AuthPayload {
   userId: string;
@@ -27,29 +27,31 @@ function decodeToken(token: string): AuthPayload {
 }
 
 export async function login(loginId: string, password: string): Promise<{ success: boolean; error?: string; user?: AuthPayload }> {
-  // Query users table checking 'email' column with 'loginId'. Case insensitive.
-  const { data: users, error } = await supabase.from('users').select('*').ilike('email', loginId);
-  if (error || !users || users.length === 0) return { success: false, error: 'Kullanıcı ID veya şifre hatalı.' };
-  
-  const found = users[0];
-  if (found.password !== password) return { success: false, error: 'Kullanıcı ID veya şifre hatalı.' };
+  try {
+    // PocketBase can sign in with email or username
+    const authData = await pb.collection('users').authWithPassword(loginId, password);
+    const { record } = authData;
 
-  const payload: AuthPayload = {
-    userId: found.id,
-    email: found.email,
-    name: found.name,
-    role: found.role as Role,
-    exp: Date.now() + 1000 * 60 * 60 * 24, // 24h
-  };
+    const payload: AuthPayload = {
+      userId: record.id,
+      email: record.email || record.username,
+      name: record.name,
+      role: record.role as Role,
+      exp: Date.now() + 1000 * 60 * 60 * 24, // 24h
+    };
 
-  const token = encodeToken(payload);
-  localStorage.setItem('bc_token', token);
-  return { success: true, user: payload };
+    const token = encodeToken(payload);
+    localStorage.setItem('bc_token', token);
+    return { success: true, user: payload };
+  } catch (err: any) {
+    return { success: false, error: 'Kullanıcı ID veya şifre hatalı.' };
+  }
 }
 
 export function logout() {
   if (typeof window !== 'undefined') {
     localStorage.removeItem('bc_token');
+    pb.authStore.clear(); // Also clear PocketBase auth store
   }
 }
 
@@ -60,8 +62,6 @@ export function getAuthUser(): AuthPayload | null {
   try {
     const payload = decodeToken(token);
     if (payload.exp < Date.now()) { logout(); return null; }
-    // Token valid, return payload (sync fetch)
-    // To sync role/name changes, we trust updateTokenPayload to keep the token updated
     return payload;
   } catch {
     logout();

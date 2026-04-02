@@ -1,7 +1,6 @@
-'use client';
 import { create } from 'zustand';
 import { User, Role } from '@/lib/types';
-import { supabase } from '@/lib/supabase';
+import { pb } from '@/lib/pocketbase';
 import { updateTokenPayload, getAuthUser } from '@/lib/auth';
 
 interface UsersState {
@@ -18,17 +17,22 @@ export const useUsersStore = create<UsersState>((set, get) => ({
   users: [],
 
   load: async () => {
-    const { data, error } = await supabase.from('users').select('*').order('created_at', { ascending: true });
-    if (error) { console.error('Error loading users:', error); return; }
-    const mapped: User[] = data.map(row => ({
-      id: row.id,
-      name: row.name,
-      email: row.email,
-      role: row.role as Role,
-      password: row.password,
-      createdAt: row.created_at
-    }));
-    set({ users: mapped });
+    try {
+      const records = await pb.collection('users').getFullList({
+        sort: '+created',
+      });
+      const mapped: User[] = records.map(record => ({
+        id: record.id,
+        name: record.name,
+        email: record.email || record.username,
+        role: record.role as Role,
+        password: record.password_plain || '********', // Use custom field if present, or mask
+        createdAt: record.created
+      }));
+      set({ users: mapped });
+    } catch (error) {
+      console.error('Error loading users:', error);
+    }
   },
 
   addUser: async (data) => {
@@ -37,29 +41,34 @@ export const useUsersStore = create<UsersState>((set, get) => ({
       return { success: false, error: 'Bu Kullanıcı ID zaten kullanımda.' };
     }
     
-    // Server-side unique constraint check is also done by Postgres, but we checked client side first
-    const { data: inserted, error } = await supabase.from('users').insert({
-      name: data.name,
-      email: data.email,
-      role: data.role,
-      password: data.password
-    }).select().single();
-    
-    if (error) { 
-      return { success: false, error: 'Veritabanına kaydedilirken hata oluştu.' }; 
+    try {
+      // In PocketBase 'users' collection:
+      const inserted = await pb.collection('users').create({
+        username: data.email.split('@')[0], // Use email part as username
+        email: data.email.includes('@') ? data.email : `${data.email}@bosscar.local`,
+        name: data.name,
+        role: data.role,
+        password: data.password,
+        passwordConfirm: data.password,
+        password_plain: data.password, // Store plain for UI if required by existing logic
+        emailVisibility: true
+      });
+      
+      const newUser: User = {
+        id: inserted.id,
+        name: inserted.name,
+        email: inserted.email || inserted.username,
+        role: inserted.role as Role,
+        password: data.password,
+        createdAt: inserted.created
+      };
+      
+      set({ users: [...users, newUser] });
+      return { success: true };
+    } catch (error: any) {
+      console.error(error);
+      return { success: false, error: error.message || 'Kullanıcı oluşturulurken hata oluştu.' };
     }
-    
-    const newUser: User = {
-      id: inserted.id,
-      name: inserted.name,
-      email: inserted.email,
-      role: inserted.role as Role,
-      password: inserted.password,
-      createdAt: inserted.created_at
-    };
-    
-    set({ users: [...users, newUser] });
-    return { success: true };
   },
 
   updateUser: async (id, data) => {
@@ -68,15 +77,12 @@ export const useUsersStore = create<UsersState>((set, get) => ({
     
     const currentUser = getAuthUser();
     if (currentUser?.userId === id) {
-      const payloadUpdate: any = {};
-      if (data.name) payloadUpdate.name = data.name;
-      if (data.email) payloadUpdate.email = data.email;
-      if (data.role) payloadUpdate.role = data.role;
-      updateTokenPayload(payloadUpdate);
+      updateTokenPayload(data);
     }
     
-    const { error } = await supabase.from('users').update(data).eq('id', id);
-    if (error) {
+    try {
+      await pb.collection('users').update(id, data);
+    } catch (error) {
       console.error(error);
       set({ users: prev }); // Revert
     }
@@ -86,8 +92,9 @@ export const useUsersStore = create<UsersState>((set, get) => ({
     const prev = get().users;
     set({ users: prev.filter(u => u.id !== id) });
     
-    const { error } = await supabase.from('users').delete().eq('id', id);
-    if (error) {
+    try {
+      await pb.collection('users').delete(id);
+    } catch (error) {
       console.error(error);
       set({ users: prev });
     }
@@ -97,8 +104,13 @@ export const useUsersStore = create<UsersState>((set, get) => ({
     const prev = get().users;
     set({ users: prev.map(u => u.id === id ? { ...u, password: newPassword } : u) });
     
-    const { error } = await supabase.from('users').update({ password: newPassword }).eq('id', id);
-    if (error) {
+    try {
+      await pb.collection('users').update(id, {
+        password: newPassword,
+        passwordConfirm: newPassword,
+        password_plain: newPassword
+      });
+    } catch (error) {
       console.error(error);
       set({ users: prev });
     }
@@ -113,8 +125,9 @@ export const useUsersStore = create<UsersState>((set, get) => ({
       updateTokenPayload({ role });
     }
 
-    const { error } = await supabase.from('users').update({ role }).eq('id', id);
-    if (error) {
+    try {
+      await pb.collection('users').update(id, { role });
+    } catch (error) {
       console.error(error);
       set({ users: prev });
     }

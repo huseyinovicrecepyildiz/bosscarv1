@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  # Isolated PocketBase for Boss Car v1
+  pb-v1:
+    image: mujo/pocketbase:latest
+    container_name: boss-car-pb-v1
+    restart: always
+    ports:
+      - "8091:8090"
+    volumes:
+      - ./pb_data_v1:/pb_data
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8090/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Next.js Application
+  app-v1:
+    build:
+      context: .
+      args:
+        - NEXT_PUBLIC_PB_URL=http://91.151.88.87:8091 # Public URL for client-side
+    container_name: boss-car-app-v1
+    restart: always
+    ports:
+      - "3001:3000"
+    environment:
+      - NEXT_PUBLIC_PB_URL=http://91.151.88.87:8091
+    depends_on:
+      pb-v1:
+        condition: service_healthy

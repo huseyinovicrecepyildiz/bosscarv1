@@ -1,7 +1,6 @@
-'use client';
 import { create } from 'zustand';
 import { ServiceType, VehiclePrice } from '@/lib/types';
-import { supabase } from '@/lib/supabase';
+import { pb } from '@/lib/pocketbase';
 
 interface ServicesState {
   services: ServiceType[];
@@ -18,51 +17,54 @@ export const useServicesStore = create<ServicesState>((set, get) => ({
   services: [],
 
   load: async () => {
-    const { data, error } = await supabase.from('services').select('*').order('created_at', { ascending: true });
-    if (error) { console.error('Error loading services:', error); return; }
-    const mapped: ServiceType[] = data.map(row => ({
-      id: row.id,
-      name: row.name,
-      prices: row.prices,
-      isPpf: row.is_ppf,
-      active: row.active,
-      createdAt: row.created_at
-    }));
-    set({ services: mapped });
+    try {
+      const records = await pb.collection('services').getFullList({
+        sort: '+created',
+      });
+      const mapped: ServiceType[] = records.map(record => ({
+        id: record.id,
+        name: record.name,
+        prices: record.prices,
+        isPpf: record.isPpf,
+        active: record.active,
+        createdAt: record.created
+      }));
+      set({ services: mapped });
+    } catch (error) {
+      console.error('Error loading services:', error);
+    }
   },
 
   addService: async (data) => {
-    const { data: inserted, error } = await supabase.from('services').insert({
-      name: data.name,
-      prices: data.prices,
-      is_ppf: data.isPpf,
-      active: data.active
-    }).select().single();
-    if (error) { console.error(error); return; }
-    const newService: ServiceType = {
-      id: inserted.id,
-      name: inserted.name,
-      prices: inserted.prices,
-      isPpf: inserted.is_ppf,
-      active: inserted.active,
-      createdAt: inserted.created_at
-    };
-    set({ services: [...get().services, newService] });
+    try {
+      const inserted = await pb.collection('services').create({
+        name: data.name,
+        prices: data.prices,
+        isPpf: data.isPpf,
+        active: data.active
+      });
+      const newService: ServiceType = {
+        id: inserted.id,
+        name: inserted.name,
+        prices: inserted.prices,
+        isPpf: inserted.isPpf,
+        active: inserted.active,
+        createdAt: inserted.created
+      };
+      set({ services: [...get().services, newService] });
+    } catch (error) {
+      console.error(error);
+    }
   },
 
   updateService: async (id, data) => {
-    const updates: any = {};
-    if (data.name !== undefined) updates.name = data.name;
-    if (data.prices !== undefined) updates.prices = data.prices;
-    if (data.isPpf !== undefined) updates.is_ppf = data.isPpf;
-    if (data.active !== undefined) updates.active = data.active;
-    
     // Optimistic UI
     const prev = get().services;
     set({ services: prev.map(s => s.id === id ? { ...s, ...data } : s) });
     
-    const { error } = await supabase.from('services').update(updates).eq('id', id);
-    if (error) {
+    try {
+      await pb.collection('services').update(id, data);
+    } catch (error) {
       console.error(error);
       set({ services: prev }); // Revert on error
     }
@@ -77,8 +79,9 @@ export const useServicesStore = create<ServicesState>((set, get) => ({
     const prev = get().services;
     set({ services: prev.map(s => s.id === id ? { ...s, active: newActive } : s) });
     
-    const { error } = await supabase.from('services').update({ active: newActive }).eq('id', id);
-    if (error) {
+    try {
+      await pb.collection('services').update(id, { active: newActive });
+    } catch (error) {
       console.error(error);
       set({ services: prev });
     }
@@ -89,8 +92,9 @@ export const useServicesStore = create<ServicesState>((set, get) => ({
     const prev = get().services;
     set({ services: prev.filter(s => s.id !== id) });
     
-    const { error } = await supabase.from('services').delete().eq('id', id);
-    if (error) {
+    try {
+      await pb.collection('services').delete(id);
+    } catch (error) {
       console.error(error);
       set({ services: prev });
     }
