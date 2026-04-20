@@ -35,6 +35,7 @@ export interface Sale {
   staffName: string;
   date: string;
   note?: string;            // optional sale note
+  ppfPanels?: string[];     // panel id list for PPF coatings (only filled for PPF sales)
   createdAt: string;
 }
 

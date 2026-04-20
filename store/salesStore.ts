@@ -51,6 +51,7 @@ export const useSalesStore = create<SalesState>((set, get) => ({
         staffName: record.staffName,
         date: record.date,
         note: record.note,
+        ppfPanels: Array.isArray(record.ppfPanels) ? record.ppfPanels : [],
         createdAt: record.created
       }));
       set({ sales: mapped });
@@ -70,9 +71,10 @@ export const useSalesStore = create<SalesState>((set, get) => ({
         staffId: data.staffId,
         staffName: data.staffName,
         date: data.date,
-        note: data.note
+        note: data.note,
+        ppfPanels: data.ppfPanels ?? []
       });
-      
+
       const newSale: Sale = {
         id: inserted.id,
         plate: inserted.plate,
@@ -84,6 +86,7 @@ export const useSalesStore = create<SalesState>((set, get) => ({
         staffName: inserted.staffName,
         date: inserted.date,
         note: inserted.note,
+        ppfPanels: Array.isArray(inserted.ppfPanels) ? inserted.ppfPanels : [],
         createdAt: inserted.created
       };
       

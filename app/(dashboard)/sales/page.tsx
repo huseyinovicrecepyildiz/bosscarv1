@@ -7,6 +7,7 @@ import { validatePlate, formatCurrency, formatDate } from '@/lib/validators';
 import { Period, Sale } from '@/lib/types';
 import PeriodFilter from '@/components/PeriodFilter';
 import RoleGuard from '@/components/RoleGuard';
+import CarBodyDiagram from '@/components/CarBodyDiagram';
 
 const VEHICLE_TYPES = ['Sedan', 'SUV', 'Pickup', 'Van', 'Minibüs', 'Motosiklet'];
 const VEHICLE_ICONS: Record<string, string> = {
@@ -36,6 +37,7 @@ function SalesContent() {
   const [loading, setLoading] = useState(false);
   const [period, setPeriod] = useState<Period>('daily');
   const [editingSale, setEditingSale] = useState<Sale | null>(null);
+  const [ppfPanels, setPpfPanels] = useState<string[]>([]);
 
   useEffect(() => { loadServices(); loadSales(); }, [loadServices, loadSales]);
 
@@ -91,9 +93,10 @@ function SalesContent() {
       staffName: user.name,
       date: new Date().toISOString().split('T')[0],
       note: note.trim() || undefined,
+      ppfPanels: isPpfService ? ppfPanels : undefined,
     });
     setSuccess(`✅ ${plate.toUpperCase()} — ${vehicleType} "${selectedService.name}" kaydedildi! +${formatCurrency(finalPrice)}`);
-    setPlate(''); setVehicleType(''); setServiceId(''); setManualPrice(''); setNote(''); setErrors({});
+    setPlate(''); setVehicleType(''); setServiceId(''); setManualPrice(''); setNote(''); setPpfPanels([]); setErrors({});
     setLoading(false);
     setTimeout(() => setSuccess(null), 4000);
   };
@@ -102,10 +105,11 @@ function SalesContent() {
     daily: 'Bugün', weekly: 'Bu Hafta', monthly: 'Bu Ay',
   };
 
-  // When service changes, reset manual price
+  // When service changes, reset manual price and PPF panel selection
   const handleServiceSelect = (id: string) => {
     setServiceId(id);
     setManualPrice('');
+    setPpfPanels([]);
     setErrors(p => ({ ...p, serviceId: undefined, manualPrice: undefined }));
   };
 
@@ -277,6 +281,17 @@ function SalesContent() {
               </div>
             )}
 
+            {/* PPF Body Panel Selector */}
+            {isPpfService && serviceId && (
+              <div>
+                <label className="label" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span>🎯 Kaplanan Kaporta Parçaları</span>
+                  <span style={{ fontSize: '0.7rem', color: '#475569', fontWeight: 400 }}>isteğe bağlı</span>
+                </label>
+                <CarBodyDiagram value={ppfPanels} onChange={setPpfPanels} />
+              </div>
+            )}
+
             {/* Price preview (non-PPF) */}
             {!isPpfService && autoPrice !== null && (
               <div style={{
@@ -429,13 +444,18 @@ function SalesContent() {
       </div>
 
       {/* Edit Modal */}
-      {editingSale && (
+      {editingSale && (() => {
+        const editService = services.find(s => s.id === editingSale.serviceId);
+        const isEditPpf = editService?.isPpf ?? editingSale.serviceName.toLowerCase().includes('ppf');
+        const editPanels = editingSale.ppfPanels ?? [];
+        return (
         <div style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 100,
           background: 'rgba(2,6,23,0.8)', backdropFilter: 'blur(4px)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem'
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem',
+          overflowY: 'auto'
         }}>
-          <div className="card animate-fade-in-up" style={{ width: '100%', maxWidth: 450, padding: '1.5rem', background: '#0f172a', border: '1px solid rgba(71,85,105,0.4)', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)' }}>
+          <div className="card animate-fade-in-up" style={{ width: '100%', maxWidth: 450, padding: '1.5rem', background: '#0f172a', border: '1px solid rgba(71,85,105,0.4)', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)', maxHeight: '90vh', overflowY: 'auto' }}>
             <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#f1f5f9', marginBottom: '1.25rem', borderBottom: '1px solid rgba(71,85,105,0.2)', paddingBottom: '0.75rem' }}>
               Satışı Düzenle
             </h3>
@@ -470,12 +490,28 @@ function SalesContent() {
                 />
               </div>
 
+              {isEditPpf && (
+                <div>
+                  <label className="label" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <span>🎯 Kaplanan Kaporta Parçaları</span>
+                  </label>
+                  <CarBodyDiagram
+                    value={editPanels}
+                    onChange={(ids) => setEditingSale({ ...editingSale, ppfPanels: ids })}
+                  />
+                </div>
+              )}
+
               <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
                 <button type="button" className="btn-secondary" style={{ flex: 1, padding: '0.75rem' }} onClick={() => setEditingSale(null)}>
                   İptal
                 </button>
                 <button type="button" className="btn-primary" style={{ flex: 1, padding: '0.75rem' }} onClick={() => {
-                  updateSale(editingSale.id, { amount: editingSale.amount, note: editingSale.note });
+                  updateSale(editingSale.id, {
+                    amount: editingSale.amount,
+                    note: editingSale.note,
+                    ...(isEditPpf ? { ppfPanels: editingSale.ppfPanels ?? [] } : {}),
+                  });
                   setEditingSale(null);
                 }}>
                   Değişiklikleri Kaydet
@@ -484,7 +520,8 @@ function SalesContent() {
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       <style>{`
         @media (max-width: 1024px) {
