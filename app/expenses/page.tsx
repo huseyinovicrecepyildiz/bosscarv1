@@ -6,6 +6,8 @@ import { Expense, Period } from '@/lib/types';
 import RoleGuard from '@/components/RoleGuard';
 import PeriodFilter from '@/components/PeriodFilter';
 
+export const dynamic = 'force-dynamic';
+
 const CATEGORIES: Expense['category'][] = ['Fatura', 'Maaş', 'Kira', 'Malzeme', 'Diğer'];
 const CATEGORY_ICONS: Record<string, string> = { Fatura: '📄', Maaş: '👤', Kira: '🏠', Malzeme: '🧴', Diğer: '📦' };
 const CATEGORY_COLORS: Record<string, string> = {

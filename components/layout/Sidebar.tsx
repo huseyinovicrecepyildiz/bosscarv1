@@ -39,6 +39,7 @@ export default function Sidebar({ mobileOpen, onClose }: SidebarProps) {
 
   const handleLogout = () => {
     logout();
+    onClose();
     router.replace('/login');
   };
 

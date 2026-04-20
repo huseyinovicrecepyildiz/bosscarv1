@@ -34,20 +34,21 @@ export const useExpensesStore = create<ExpensesState>((set, get) => ({
 
   load: async () => {
     try {
-      const records = await pb.collection('expenses').getFullList({
-        sort: '-date',
-      });
+      const records = await pb.collection('expenses').getFullList();
       const mapped: Expense[] = records.map(record => ({
         id: record.id,
         category: record.category,
         amount: record.amount,
         note: record.note,
-        date: record.date,
+        date: record.date ? String(record.date).slice(0, 10) : '',
         createdAt: record.created
       }));
       set({ expenses: mapped });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error loading expenses:', error);
+      if (typeof window !== 'undefined') {
+         try { window.alert("Masraflar yüklenemedi: " + (error?.response?.message || error.message)); } catch(e) {}
+      }
     }
   },
 
@@ -70,8 +71,11 @@ export const useExpensesStore = create<ExpensesState>((set, get) => ({
       };
       
       set({ expenses: [newExpense, ...get().expenses] });
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
+      if (typeof window !== 'undefined') {
+         try { window.alert("Masraf eklenemedi: " + (error?.response?.message || error.message)); } catch(e) {}
+      }
     }
   },
 

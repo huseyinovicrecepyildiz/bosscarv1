@@ -1,86 +1,83 @@
-import { Role } from './types';
 import { pb } from './pocketbase';
 
-export interface AuthPayload {
-  userId: string;
-  email: string;
-  name: string;
-  role: Role;
-  exp: number;
-}
-
-// UTF-8 safe base64 encode/decode for Turkish characters
-function encodeToken(payload: AuthPayload): string {
-  const json = JSON.stringify(payload);
-  const utf8 = encodeURIComponent(json).replace(/%([0-9A-F]{2})/g, (_, p1) =>
-    String.fromCharCode(parseInt(p1, 16))
-  );
-  return btoa(utf8);
-}
-
-function decodeToken(token: string): AuthPayload {
-  const decoded = atob(token);
-  const utf8 = decodeURIComponent(
-    decoded.split('').map(c => '%' + c.charCodeAt(0).toString(16).padStart(2, '0')).join('')
-  );
-  return JSON.parse(utf8) as AuthPayload;
-}
-
-export async function login(loginId: string, password: string): Promise<{ success: boolean; error?: string; user?: AuthPayload }> {
+export const login = async (loginId: string, pass: string) => {
   try {
-    // PocketBase can sign in with email or username
-    const authData = await pb.collection('users').authWithPassword(loginId, password);
-    const { record } = authData;
+    const identifier = loginId.trim().includes('@') ? loginId.trim() : `${loginId.trim()}@bosscar.local`;
+    const authData = await pb.collection('users').authWithPassword(identifier, pass);
 
-    const payload: AuthPayload = {
-      userId: record.id,
-      email: record.email || record.username,
-      name: record.name,
-      role: record.role as Role,
-      exp: Date.now() + 1000 * 60 * 60 * 24, // 24h
+    // Cookie zırhı
+    try {
+      document.cookie = pb.authStore.exportToCookie({ httpOnly: false, secure: false, path: '/' });
+    } catch (e) {
+      console.warn("Safari cookie engeli aşıldı");
+    }
+
+    const payload = {
+      userId: authData.record.id,
+      email: authData.record.email,
+      name: authData.record.name,
+      role: authData.record.role ? String(authData.record.role).toLowerCase() : 'personel',
+      exp: Date.now() + 86400000
     };
 
-    const token = encodeToken(payload);
-    localStorage.setItem('bc_token', token);
+    const jsonStr = JSON.stringify(payload);
+    const safeBase64 = btoa(encodeURIComponent(jsonStr));
+    
+    // LocalStorage zırhı
+    try {
+      localStorage.setItem('bc_token', safeBase64);
+    } catch(e) {
+      console.warn("Safari localStorage engeli aşıldı");
+    }
+    
     return { success: true, user: payload };
   } catch (err: any) {
-    return { success: false, error: 'Kullanıcı ID veya şifre hatalı.' };
+    return { success: false, error: "Hatalı Giriş!" };
   }
-}
+};
 
-export function logout() {
-  if (typeof window !== 'undefined') {
-    localStorage.removeItem('bc_token');
-    pb.authStore.clear(); // Also clear PocketBase auth store
-  }
-}
-
-export function getAuthUser(): AuthPayload | null {
-  if (typeof window === 'undefined') return null;
-  const token = localStorage.getItem('bc_token');
-  if (!token) return null;
-  try {
-    const payload = decodeToken(token);
-    if (payload.exp < Date.now()) { logout(); return null; }
-    return payload;
-  } catch {
-    logout();
-    return null;
-  }
-}
-
-// Allows updating the JWT payload synchronously without querying db
-export function updateTokenPayload(partial: Partial<AuthPayload>) {
+/**
+ * 🚨 SIDEBAR HATASINI ÇÖZEN FONKSİYON
+ */
+export const logout = () => {
   if (typeof window === 'undefined') return;
-  const token = localStorage.getItem('bc_token');
-  if (!token) return;
   try {
-    const payload = decodeToken(token);
-    const newPayload = { ...payload, ...partial };
-    localStorage.setItem('bc_token', encodeToken(newPayload));
-  } catch {}
-}
+    pb.authStore.clear();
+    document.cookie = "pb_auth=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;";
+    localStorage.removeItem('bc_token');
+  } catch (e) {}
+};
 
-export function canAccess(role: Role, requiredRoles: Role[]): boolean {
-  return requiredRoles.includes(role);
-}
+export const getAuthUser = () => {
+  if (typeof window === 'undefined') return null;
+  
+  // 🚨 İŞTE SAFARİ'Yİ ÇÖKERTEN YER BURASIYDI! Tamamen try-catch İÇİNE aldık.
+  try {
+    const token = localStorage.getItem('bc_token');
+    if (!token) return null;
+    
+    const decodedStr = decodeURIComponent(atob(token));
+    const payload = JSON.parse(decodedStr);
+    
+    if (payload.exp > Date.now()) {
+      if (payload.role) payload.role = String(payload.role).toLowerCase();
+      return payload;
+    }
+    
+    localStorage.removeItem('bc_token');
+    return null;
+  } catch (err) { 
+    return null; 
+  }
+};
+
+export const updateTokenPayload = (newData: any) => {
+  if (typeof window === 'undefined') return;
+  try {
+    const currentUser = getAuthUser();
+    if (!currentUser) return;
+    const updatedUser = { ...currentUser, ...newData };
+    const safeBase64 = btoa(encodeURIComponent(JSON.stringify(updatedUser)));
+    localStorage.setItem('bc_token', safeBase64);
+  } catch (e) {}
+};

@@ -1,7 +1,2 @@
-import type { NextConfig } from "next";
-
-const nextConfig: NextConfig = {
-  basePath: '/bosscardetail',
-};
-
+const nextConfig = {};
 export default nextConfig;

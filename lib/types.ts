@@ -18,8 +18,8 @@ export interface VehiclePrice {
 export interface ServiceType {
   id: string;
   name: string;
-  prices: VehiclePrice[];   // per-vehicle pricing
-  isPpf?: boolean;          // PPF: price must be entered manually per sale
+  prices: VehiclePrice[];
+  isPpf?: boolean;
   active: boolean;
   createdAt: string;
 }
@@ -34,7 +34,10 @@ export interface Sale {
   staffId: string;
   staffName: string;
   date: string;
-  note?: string;            // optional sale note
+  note?: string;
+  ppfPanels?: string[];
+  paymentAmount?: number;
+  paymentStatus?: 'ödenmedi' | 'kısmi ödeme' | 'ödendi';
   createdAt: string;
 }
 

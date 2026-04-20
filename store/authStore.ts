@@ -1,41 +1,60 @@
-'use client';
 import { create } from 'zustand';
-import { AuthPayload, getAuthUser, login, logout } from '@/lib/auth';
+import { login as loginApi, logout as logoutApi, getAuthUser } from '@/lib/auth';
 
 interface AuthState {
-  user: AuthPayload | null;
+  user: any;
   initialized: boolean;
-  login: (loginId: string, password: string) => Promise<{ success: boolean; error?: string }>;
-  logout: () => void;
   init: () => void;
   refresh: () => void;
+  login: (id: string, pass: string) => Promise<{ success: boolean; error?: string }>;
+  logout: () => void; 
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   initialized: false,
-
+  
   init: () => {
-    const user = getAuthUser();
-    set({ user, initialized: true });
-  },
-
-  refresh: () => {
-    const user = getAuthUser();
-    set({ user });
-  },
-
-  login: async (loginId, password) => {
-    const result = await login(loginId, password);
-    if (result.success && result.user) {
-      set({ user: result.user });
-      return { success: true };
+    try {
+      // Safari burada hata fırlatsa bile uygulama çökmeyecek
+      const user = getAuthUser();
+      set({ user, initialized: true });
+    } catch (error) {
+      console.warn("Safari/Storage erişim engeli yakalandı:", error);
+      // Hata olsa bile initialized: true diyoruz ki sonsuz döngüden çıkıp Login'e atabilsin
+      set({ user: null, initialized: true });
     }
-    return { success: false, error: result.error };
   },
-
-  logout: () => {
-    logout();
+  
+  refresh: () => {
+    try {
+      const user = getAuthUser();
+      set({ user });
+    } catch (error) {
+      set({ user: null });
+    }
+  },
+  
+  login: async (id, pass) => {
+    try {
+      const result = await loginApi(id, pass);
+      if (result.success && result.user) {
+        set({ user: result.user, initialized: true });
+        return { success: true };
+      }
+      return { success: false, error: result.error };
+    } catch (error) {
+      return { success: false, error: 'Giriş sırasında bir hata oluştu.' };
+    }
+  },
+  
+  logout: () => { 
+    try {
+      logoutApi();
+    } catch (error) {
+      console.warn("Logout sırasında storage hatası:", error);
+    }
     set({ user: null });
-  },
+    window.location.href = '/login';
+  }
 }));

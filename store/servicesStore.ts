@@ -18,17 +18,23 @@ export const useServicesStore = create<ServicesState>((set, get) => ({
 
   load: async () => {
     try {
-      const records = await pb.collection('services').getFullList({
-        sort: '+created',
+      const records = await pb.collection('services').getFullList();
+      const mapped: ServiceType[] = records.map(record => {
+        let parsedPrices = [];
+        if (Array.isArray(record.prices)) {
+          parsedPrices = record.prices;
+        } else if (typeof record.prices === 'string') {
+          try { parsedPrices = JSON.parse(record.prices); } catch { parsedPrices = []; }
+        }
+        return {
+          id: record.id,
+          name: record.name || 'İsimsiz Hizmet',
+          prices: parsedPrices,
+          isPpf: !!record.isPpf,
+          active: record.active !== undefined ? !!record.active : true,
+          createdAt: record.created
+        };
       });
-      const mapped: ServiceType[] = records.map(record => ({
-        id: record.id,
-        name: record.name,
-        prices: record.prices,
-        isPpf: record.isPpf,
-        active: record.active,
-        createdAt: record.created
-      }));
       set({ services: mapped });
     } catch (error) {
       console.error('Error loading services:', error);
@@ -52,8 +58,11 @@ export const useServicesStore = create<ServicesState>((set, get) => ({
         createdAt: inserted.created
       };
       set({ services: [...get().services, newService] });
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
+      if (typeof window !== 'undefined') {
+        try { window.alert("Hizmet eklenemedi: Lütfen PocketBase tablosunun kurallarını ve sütunlarını (prices=JSON) kontrol edin."); } catch(e) {}
+      }
     }
   },
 
@@ -64,9 +73,12 @@ export const useServicesStore = create<ServicesState>((set, get) => ({
     
     try {
       await pb.collection('services').update(id, data);
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
       set({ services: prev }); // Revert on error
+      if (typeof window !== 'undefined') {
+        try { window.alert("Hizmet güncellenemedi."); } catch(e) {}
+      }
     }
   },
 

@@ -5,6 +5,8 @@ import { formatCurrency } from '@/lib/validators';
 import { ServiceType, VehiclePrice } from '@/lib/types';
 import RoleGuard from '@/components/RoleGuard';
 
+export const dynamic = 'force-dynamic';
+
 const ALL_VEHICLE_TYPES = ['Sedan', 'SUV', 'Pickup', 'Van', 'Minibüs', 'Motosiklet'];
 
 const VEHICLE_ICONS: Record<string, string> = {

@@ -38,7 +38,7 @@ export const useSalesStore = create<SalesState>((set, get) => ({
   load: async () => {
     try {
       const records = await pb.collection('sales').getFullList({
-        sort: '-created',
+        sort: '-date',
       });
       const mapped: Sale[] = records.map(record => ({
         id: record.id,
@@ -51,7 +51,10 @@ export const useSalesStore = create<SalesState>((set, get) => ({
         staffName: record.staffName,
         date: record.date,
         note: record.note,
-        createdAt: record.created
+        ppfPanels: Array.isArray(record.ppfPanels) ? record.ppfPanels : [],
+        paymentAmount: record.paymentAmount ?? 0,
+        paymentStatus: record.paymentStatus || 'ödenmedi',
+        createdAt: record.created ?? record.date
       }));
       set({ sales: mapped });
     } catch (error) {
@@ -70,9 +73,12 @@ export const useSalesStore = create<SalesState>((set, get) => ({
         staffId: data.staffId,
         staffName: data.staffName,
         date: data.date,
-        note: data.note
+        note: data.note,
+        ppfPanels: data.ppfPanels ?? [],
+        paymentAmount: (data as any).paymentAmount ?? 0,
+        paymentStatus: (data as any).paymentStatus ?? 'ödenmedi'
       });
-      
+
       const newSale: Sale = {
         id: inserted.id,
         plate: inserted.plate,
@@ -84,9 +90,12 @@ export const useSalesStore = create<SalesState>((set, get) => ({
         staffName: inserted.staffName,
         date: inserted.date,
         note: inserted.note,
-        createdAt: inserted.created
+        ppfPanels: Array.isArray(inserted.ppfPanels) ? inserted.ppfPanels : [],
+        paymentAmount: inserted.paymentAmount ?? 0,
+        paymentStatus: inserted.paymentStatus || 'ödenmedi',
+        createdAt: inserted.created ?? inserted.date
       };
-      
+
       set({ sales: [newSale, ...get().sales] });
     } catch (error) {
       console.error(error);
@@ -97,7 +106,7 @@ export const useSalesStore = create<SalesState>((set, get) => ({
     if (!confirm('Bu satışı silmek istediğinize emin misiniz?')) return;
     const prev = get().sales;
     set({ sales: prev.filter(s => s.id !== id) });
-    
+
     try {
       await pb.collection('sales').delete(id);
     } catch (error) {
